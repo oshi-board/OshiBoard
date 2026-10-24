@@ -991,3 +991,42 @@ body.board-fullscreen .board-member-line {
   }
 }
 
+/* ========================================
+   求・譲ボード：名前と写真種類を分離
+======================================== */
+
+.board-member-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.board-member-name {
+  display: block;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.board-member-types {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.board-type-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font-size: 0.82em;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+

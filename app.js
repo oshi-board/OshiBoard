@@ -1592,6 +1592,7 @@ function boardEntries(mode) {
   return entries;
 }
 
+
 function renderBoardColumn(containerId, mode) {
   const container = $(containerId);
   container.replaceChildren();
@@ -1627,17 +1628,28 @@ function renderBoardColumn(containerId, mode) {
         "board-member-row"
       );
 
+      // メンバー名：独立した1行
       const member = createElement(
-        "span",
+        "div",
         "board-member-name",
         line.member
       );
 
+      // 写真の種類：名前とは別の領域
       const types = createElement(
-        "span",
-        "board-member-types",
-        line.types.join("・")
+        "div",
+        "board-member-types"
       );
+
+      line.types.forEach(type => {
+        const tag = createElement(
+          "span",
+          "board-type-tag",
+          type
+        );
+
+        types.appendChild(tag);
+      });
 
       row.append(member, types);
       block.appendChild(row);
@@ -1646,6 +1658,7 @@ function renderBoardColumn(containerId, mode) {
     container.appendChild(block);
   });
 }
+
 
 function renderBoard() {
   const want = $("wantBoard");
