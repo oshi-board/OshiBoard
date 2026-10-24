@@ -5,11 +5,12 @@
    推しボード Service Worker
 ======================================== */
 
-const CACHE_NAME = "oshiboard-app-v1";
+const CACHE_NAME = "oshiboard-app-v2";
 
 const APP_FILES = [
   "./",
   "./index.html",
+  "./policy.html",
   "./style.css",
   "./data.js",
   "./app.js",
