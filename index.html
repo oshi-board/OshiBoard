@@ -86,15 +86,6 @@
     <h2>メンバー選択</h2>
     <p id="memberGroupName" class="subheading"></p>
 
-    <div class="status-tabs">
-      <button id="activeTab" class="status-tab active">
-        現役
-      </button>
-      <button id="graduatedTab" class="status-tab">
-        卒業
-      </button>
-    </div>
-
     <div class="filter-row">
       <label for="generationFilter">期別</label>
       <select id="generationFilter">
@@ -119,12 +110,120 @@
 
     <div id="memberList" class="member-list"></div>
 
+    <button id="openMemberManager"
+            class="secondary member-manager-launch">
+      ＋ メンバーを追加・編集
+    </button>
+
     <div class="action-row">
       <button id="cancelMembers" class="secondary">
         キャンセル
       </button>
       <button id="confirmMembers" class="primary">
         決定
+      </button>
+    </div>
+  </section>
+
+  <!-- メンバー管理 -->
+  <section id="memberManagerScreen"
+           class="screen hidden">
+
+    <div class="screen-heading">
+      <h2>メンバー管理</h2>
+      <button id="backFromMemberManager"
+              class="small-button">
+        選択画面に戻る
+      </button>
+    </div>
+
+    <p id="managerGroupName" class="subheading"></p>
+
+    <p class="hint">
+      メンバーの追加・名前変更・期の変更・
+      非表示設定ができます。
+      変更内容はこの端末に保存されます。
+    </p>
+
+    <button id="addCustomMember" class="primary">
+      ＋ 新しいメンバーを追加
+    </button>
+
+    <div class="filter-row manager-filter-row">
+      <label for="managerGenerationFilter">期別</label>
+      <select id="managerGenerationFilter">
+        <option value="all">すべての期</option>
+      </select>
+    </div>
+
+    <input id="managerSearch"
+           type="search"
+           placeholder="管理するメンバーを検索"
+           autocomplete="off">
+
+    <label class="manager-show-hidden">
+      <input id="managerShowHidden"
+             type="checkbox">
+      非表示のメンバーも表示する
+    </label>
+
+    <div id="managerMemberList"
+         class="manager-member-list"></div>
+
+    <p class="hint">
+      非表示にしても、登録済みの求・譲データは
+      削除されません。
+    </p>
+  </section>
+
+  <!-- メンバー追加・編集 -->
+  <section id="memberEditScreen"
+           class="screen hidden">
+
+    <h2 id="memberEditTitle">
+      メンバー追加
+    </h2>
+
+    <p id="memberEditGroupName"
+       class="subheading"></p>
+
+    <label class="field-label"
+           for="editMemberName">
+      メンバー名
+    </label>
+
+    <input id="editMemberName"
+           type="text"
+           maxlength="100"
+           placeholder="メンバー名を入力"
+           autocomplete="off">
+
+    <label class="field-label"
+           for="editMemberGeneration">
+      期
+    </label>
+
+    <input id="editMemberGeneration"
+           type="number"
+           min="1"
+           max="99"
+           step="1"
+           inputmode="numeric"
+           placeholder="例：6">
+
+    <p class="hint">
+      名前や期を変更しても、既存の求・譲データは
+      維持されます。
+    </p>
+
+    <div class="action-row">
+      <button id="cancelMemberEdit"
+              class="secondary">
+        キャンセル
+      </button>
+      <button id="saveMemberEdit"
+              class="primary">
+        保存
       </button>
     </div>
   </section>
@@ -244,7 +343,6 @@
     </div>
   </section>
 
- 
   <footer id="appFooter">
     非公式ファン制作アプリ<br>
     無料・広告なし・会員登録不要<br>
@@ -252,7 +350,6 @@
       利用規約・プライバシーポリシー
     </a>
   </footer>
-
 
 </main>
 </body>

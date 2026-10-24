@@ -3,21 +3,24 @@
 
 /* ========================================
    推しボード データ管理
-   シンプル版
+   
+   既存の保存キーは維持
+   メンバー編集情報だけ新しいキーへ保存
 ======================================== */
 
 const OshiData = (() => {
 
   // ========================================
   // 保存キー
-  // 既存データとの互換性を維持
   // ========================================
 
   const KEYS = {
     members: "oshiboard_selected_members_v1",
     series: "oshiboard_series_v1",
     trades: "oshiboard_trades_v1",
-    settings: "oshiboard_settings_v1"
+    settings: "oshiboard_settings_v1",
+    memberCustomizations:
+      "oshiboard_member_customizations_v1"
   };
 
   const GROUPS = [
@@ -41,6 +44,33 @@ const OshiData = (() => {
   const validGroup = group =>
     GROUPS.includes(group);
 
+  const validId = id =>
+    typeof id === "string" &&
+    id.length > 0;
+
+  const validName = name =>
+    typeof name === "string" &&
+    name.trim().length > 0 &&
+    name.length <= 100;
+
+  const validGeneration = generation =>
+    Number.isInteger(generation) &&
+    generation >= 1 &&
+    generation <= 99;
+
+  // ========================================
+  // メンバー個人設定の初期値
+  // ========================================
+
+  function emptyMemberCustomizations() {
+    return {
+      added: [],
+      edits: {},
+      hidden: [],
+      cachedDefaults: []
+    };
+  }
+
   // ========================================
   // 保存データ読込
   // ========================================
@@ -63,6 +93,22 @@ const OshiData = (() => {
     return value;
   }
 
+  function readMemberCustomizations() {
+    const raw = localStorage.getItem(
+      KEYS.memberCustomizations
+    );
+
+    if (raw === null) {
+      return emptyMemberCustomizations();
+    }
+
+    const value = JSON.parse(raw);
+
+    validateMemberCustomizations(value);
+
+    return value;
+  }
+
   // ========================================
   // メンバー選択データ検証
   // ========================================
@@ -75,14 +121,10 @@ const OshiData = (() => {
     }
 
     for (const [group, ids] of Object.entries(data)) {
-
       if (
         !validGroup(group) ||
         !Array.isArray(ids) ||
-        !ids.every(id =>
-          typeof id === "string" &&
-          id.length > 0
-        ) ||
+        !ids.every(validId) ||
         new Set(ids).size !== ids.length
       ) {
         throw new Error(
@@ -123,10 +165,8 @@ const OshiData = (() => {
 
         if (
           !isObject(item) ||
-          typeof item.id !== "string" ||
-          !item.id ||
-          typeof item.name !== "string" ||
-          !item.name.trim() ||
+          !validId(item.id) ||
+          !validName(item.name) ||
           !Array.isArray(item.types) ||
           item.types.length === 0 ||
           !item.types.every(type =>
@@ -242,6 +282,111 @@ const OshiData = (() => {
   }
 
   // ========================================
+  // メンバー個人設定の検証
+  // ========================================
+
+  function validateMemberRecord(member) {
+    return (
+      isObject(member) &&
+      validId(member.id) &&
+      validGroup(member.group) &&
+      validName(member.name) &&
+      validGeneration(member.generation) &&
+      Number.isFinite(member.sortOrder)
+    );
+  }
+
+  function validateMemberCustomizations(data) {
+
+    if (
+      !isObject(data) ||
+      !Array.isArray(data.added) ||
+      !isObject(data.edits) ||
+      !Array.isArray(data.hidden) ||
+      !Array.isArray(data.cachedDefaults)
+    ) {
+      throw new Error(
+        "メンバー個人設定の形式が不正です。"
+      );
+    }
+
+    const addedIds = new Set();
+
+    for (const member of data.added) {
+
+      if (
+        !validateMemberRecord(member) ||
+        addedIds.has(member.id)
+      ) {
+        throw new Error(
+          "追加メンバーのデータが不正です。"
+        );
+      }
+
+      addedIds.add(member.id);
+    }
+
+    for (const [id, edit] of Object.entries(data.edits)) {
+
+      if (
+        !validId(id) ||
+        !isObject(edit) ||
+        (
+          edit.name !== undefined &&
+          !validName(edit.name)
+        ) ||
+        (
+          edit.generation !== undefined &&
+          !validGeneration(edit.generation)
+        )
+      ) {
+        throw new Error(
+          "メンバー編集データが不正です。"
+        );
+      }
+
+      // 名前・期以外の変更は認めない
+      if (
+        Object.keys(edit).some(
+          key => !["name", "generation"].includes(key)
+        )
+      ) {
+        throw new Error(
+          "メンバー編集項目が不正です。"
+        );
+      }
+    }
+
+    if (
+      !data.hidden.every(validId) ||
+      new Set(data.hidden).size !==
+        data.hidden.length
+    ) {
+      throw new Error(
+        "非表示メンバーのデータが不正です。"
+      );
+    }
+
+    // 過去に取得したデフォルトメンバーを保存。
+    // 後日マスタから削除されても既存データを守る。
+    const cachedIds = new Set();
+
+    for (const member of data.cachedDefaults) {
+
+      if (
+        !validateMemberRecord(member) ||
+        cachedIds.has(member.id)
+      ) {
+        throw new Error(
+          "メンバー履歴データが不正です。"
+        );
+      }
+
+      cachedIds.add(member.id);
+    }
+  }
+
+  // ========================================
   // 全データ検証
   // ========================================
 
@@ -268,6 +413,10 @@ const OshiData = (() => {
       data.settings
     );
 
+    validateMemberCustomizations(
+      data.memberCustomizations
+    );
+
     return true;
   }
 
@@ -281,7 +430,9 @@ const OshiData = (() => {
       members: readKey(KEYS.members),
       series: readKey(KEYS.series),
       trades: readKey(KEYS.trades),
-      settings: readKey(KEYS.settings)
+      settings: readKey(KEYS.settings),
+      memberCustomizations:
+        readMemberCustomizations()
     };
 
     validateAll(data);

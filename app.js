@@ -2,7 +2,7 @@
 "use strict";
 
 /* ========================================
-   推しボード 公開準備版
+   推しボード
    画面操作・全体制御
 ======================================== */
 
@@ -11,8 +11,7 @@ const $ = id => document.getElementById(id);
 const DEFAULT_TYPES = ["ヨリ", "チュウ", "ヒキ"];
 
 // ========================================
-// シリーズID生成
-// AndroidのHTTP接続にも対応
+// ID生成
 // ========================================
 
 function generateSeriesId() {
@@ -23,7 +22,6 @@ function generateSeriesId() {
     return crypto.randomUUID();
   }
 
-  // HTTP接続などでrandomUUIDが使えない場合
   return "series-" +
     Date.now().toString(36) + "-" +
     Math.random().toString(36).slice(2, 12);
@@ -35,7 +33,8 @@ let masterLoaded = false;
 
 let selectedGroup = "";
 let draftMembers = new Set();
-let currentStatus = "active";
+let editingMemberId = null;
+let memberDefaults = [];
 
 let editingSeriesId = null;
 let draftSeriesTypes = [];
@@ -119,6 +118,41 @@ function findSeries(id) {
 // メンバーマスタ
 // ========================================
 
+function normalizeMember(member) {
+  return {
+    id: member.id,
+    group: member.group,
+    name: member.name,
+    generation: member.generation,
+    sortOrder: member.sortOrder
+  };
+}
+
+function rebuildMemberMaster(defaults = memberDefaults) {
+  const c = state.memberCustomizations;
+  const byId = new Map();
+
+  for (const m of c.cachedDefaults) {
+    byId.set(m.id, { ...m });
+  }
+
+  for (const m of defaults) {
+    byId.set(m.id, { ...m });
+  }
+
+  for (const m of c.added) {
+    if (byId.has(m.id)) {
+      throw new Error("メンバーIDが重複しています。");
+    }
+    byId.set(m.id, { ...m });
+  }
+
+  memberMaster = [...byId.values()].map(m => ({
+    ...m,
+    ...(c.edits[m.id] || {})
+  }));
+}
+
 async function loadMemberMaster() {
   try {
     const response = await fetch(
@@ -133,45 +167,85 @@ async function loadMemberMaster() {
     const data = await response.json();
 
     if (!Array.isArray(data.members)) {
-      throw new Error("members.jsonの形式が不正です。");
+      throw new Error("マスタ形式が不正です。");
     }
 
     const ids = new Set();
 
-    for (const member of data.members) {
+    for (const m of data.members) {
       if (
-        typeof member.id !== "string" ||
-        !member.id ||
-        typeof member.group !== "string" ||
-        typeof member.name !== "string" ||
-        !Number.isInteger(member.generation) ||
-        !["active", "graduated"].includes(member.status) ||
-        !Number.isFinite(member.sortOrder) ||
-        ids.has(member.id)
+        !m ||
+        typeof m.id !== "string" ||
+        !m.id ||
+        ![
+          "乃木坂46",
+          "櫻坂46",
+          "日向坂46"
+        ].includes(m.group) ||
+        typeof m.name !== "string" ||
+        !m.name.trim() ||
+        !Number.isInteger(m.generation) ||
+        m.generation < 1 ||
+        m.generation > 99 ||
+        !Number.isFinite(m.sortOrder) ||
+        ids.has(m.id)
       ) {
         throw new Error(
           "メンバーマスタに不正な項目があります。"
         );
       }
 
-      ids.add(member.id);
+      ids.add(m.id);
     }
 
-    memberMaster = data.members;
-    masterLoaded = true;
+    memberDefaults = data.members.map(normalizeMember);
 
-    console.log(
-      "メンバーマスタ読込成功:",
-      memberMaster.length
+    const next = cloneState();
+
+    const history = new Map(
+      next.memberCustomizations.cachedDefaults.map(
+        m => [m.id, m]
+      )
     );
 
+    for (const m of memberDefaults) {
+      history.set(m.id, m);
+    }
+
+    next.memberCustomizations.cachedDefaults =
+      [...history.values()];
+
+    if (!saveState(next)) {
+      throw new Error(
+        "メンバー履歴を保存できませんでした。"
+      );
+    }
+
+    rebuildMemberMaster();
+    masterLoaded = true;
+
   } catch (error) {
-    masterLoaded = false;
     console.error(error);
+
+    if (
+      state.memberCustomizations.cachedDefaults.length ||
+      state.memberCustomizations.added.length
+    ) {
+      try {
+        memberDefaults = [];
+        rebuildMemberMaster();
+        masterLoaded = true;
+        return;
+      } catch (inner) {
+        console.error(inner);
+      }
+    }
+
+    masterLoaded = false;
 
     alert(
       "メンバーマスタを読み込めませんでした。\n" +
-      "members.json とLive Serverを確認してください。"
+      error.message
     );
   }
 }
@@ -197,7 +271,9 @@ document.querySelectorAll(".group").forEach(button => {
 
 $("groupNext").addEventListener("click", () => {
   if (!selectedGroup || !masterLoaded) {
-    alert("グループまたはマスタを確認してください。");
+    alert(
+      "グループまたはマスタを確認してください。"
+    );
     return;
   }
 
@@ -250,99 +326,82 @@ function renderSelectedMembers() {
 // メンバー選択
 // ========================================
 
+function isHidden(id) {
+  return state.memberCustomizations.hidden.includes(id);
+}
+
+function visibleSelectionMembers() {
+  const selected = new Set(
+    state.members[selectedGroup] || []
+  );
+
+  return memberMaster.filter(m =>
+    m.group === selectedGroup &&
+    (!isHidden(m.id) || selected.has(m.id))
+  );
+}
+
+function fillGenerationFilter(
+  id,
+  members,
+  preserve = false
+) {
+  const el = $(id);
+  const old = preserve ? el.value : "all";
+
+  el.replaceChildren(
+    new Option("すべての期", "all")
+  );
+
+  [...new Set(
+    members.map(m => m.generation)
+  )]
+    .sort((a, b) => a - b)
+    .forEach(g => {
+      el.appendChild(
+        new Option(g + "期", String(g))
+      );
+    });
+
+  el.value = [...el.options].some(
+    o => o.value === old
+  ) ? old : "all";
+}
+
+function openMemberSelector() {
+  $("memberGroupName").textContent = selectedGroup;
+  $("memberSearch").value = "";
+
+  fillGenerationFilter(
+    "generationFilter",
+    visibleSelectionMembers()
+  );
+
+  renderMemberList();
+  showScreen("memberScreen");
+}
+
 $("openMembers").addEventListener("click", () => {
   draftMembers = new Set(
     state.members[selectedGroup] || []
   );
 
-  currentStatus = "active";
-  $("memberGroupName").textContent = selectedGroup;
-  $("memberSearch").value = "";
-
-  updateStatusTabs();
-  updateGenerationFilter();
-  renderMemberList();
-
-  showScreen("memberScreen");
+  openMemberSelector();
 });
-
-function updateStatusTabs() {
-  $("activeTab").classList.toggle(
-    "active",
-    currentStatus === "active"
-  );
-
-  $("graduatedTab").classList.toggle(
-    "active",
-    currentStatus === "graduated"
-  );
-}
-
-function changeStatus(status) {
-  currentStatus = status;
-
-  updateStatusTabs();
-  updateGenerationFilter();
-  renderMemberList();
-}
-
-$("activeTab").addEventListener(
-  "click",
-  () => changeStatus("active")
-);
-
-$("graduatedTab").addEventListener(
-  "click",
-  () => changeStatus("graduated")
-);
-
-function updateGenerationFilter() {
-  const select = $("generationFilter");
-  select.replaceChildren();
-
-  const all = new Option("すべての期", "all");
-  select.appendChild(all);
-
-  const generations = [
-    ...new Set(
-      memberMaster
-        .filter(member =>
-          member.group === selectedGroup &&
-          member.status === currentStatus
-        )
-        .map(member => member.generation)
-    )
-  ].sort((a, b) => a - b);
-
-  generations.forEach(generation => {
-    select.appendChild(
-      new Option(
-        generation + "期",
-        String(generation)
-      )
-    );
-  });
-
-  select.value = "all";
-}
 
 function filteredMembers() {
   const search = $("memberSearch")
     .value.trim().toLowerCase();
 
-  const generation = $("generationFilter").value;
+  const gen = $("generationFilter").value;
 
-  return memberMaster
-    .filter(member =>
-      member.group === selectedGroup &&
-      member.status === currentStatus
+  return visibleSelectionMembers()
+    .filter(m =>
+      gen === "all" ||
+      String(m.generation) === gen
     )
-    .filter(member =>
-      generation === "all" ||
-      String(member.generation) === generation
-    )
-    .filter(member =>
-      member.name.toLowerCase().includes(search)
+    .filter(m =>
+      m.name.toLowerCase().includes(search)
     )
     .sort((a, b) =>
       a.sortOrder - b.sortOrder ||
@@ -357,25 +416,25 @@ function renderMemberList() {
   const members = filteredMembers();
 
   if (!members.length) {
-    const empty = createElement(
+    container.appendChild(createElement(
       "p",
       "empty-message",
       "該当するメンバーがいません。"
-    );
-
-    empty.style.padding = "15px";
-    container.appendChild(empty);
+    ));
   }
 
   members.forEach(member => {
-    const row = createElement("label", "member-row");
+    const row = createElement(
+      "label",
+      "member-row"
+    );
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = draftMembers.has(member.id);
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = draftMembers.has(member.id);
 
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) {
+    check.addEventListener("change", () => {
+      if (check.checked) {
         draftMembers.add(member.id);
       } else {
         draftMembers.delete(member.id);
@@ -385,12 +444,12 @@ function renderMemberList() {
     });
 
     row.append(
-      checkbox,
+      check,
       createElement(
         "span",
         "",
-        member.name + "（" +
-          member.generation + "期）"
+        member.name +
+          "（" + member.generation + "期）"
       )
     );
 
@@ -416,8 +475,8 @@ $("memberSearch").addEventListener(
 );
 
 $("selectAll").addEventListener("click", () => {
-  filteredMembers().forEach(member =>
-    draftMembers.add(member.id)
+  filteredMembers().forEach(
+    m => draftMembers.add(m.id)
   );
 
   renderMemberList();
@@ -436,12 +495,7 @@ $("cancelMembers").addEventListener(
 $("confirmMembers").addEventListener("click", () => {
   const next = cloneState();
 
-  next.members[selectedGroup] = memberMaster
-    .filter(member =>
-      member.group === selectedGroup &&
-      draftMembers.has(member.id)
-    )
-    .map(member => member.id);
+  next.members[selectedGroup] = [...draftMembers];
 
   if (saveState(next)) {
     showEditor();
@@ -449,16 +503,521 @@ $("confirmMembers").addEventListener("click", () => {
 });
 
 // ========================================
-// シリーズ一覧
+// メンバー管理
+// ========================================
+
+function groupMembers() {
+  return memberMaster
+    .filter(m => m.group === selectedGroup)
+    .sort((a, b) =>
+      a.sortOrder - b.sortOrder ||
+      a.id.localeCompare(b.id)
+    );
+}
+
+function openMemberManager(preserve = false) {
+  $("managerGroupName").textContent = selectedGroup;
+
+  if (!preserve) {
+    $("managerSearch").value = "";
+    $("managerShowHidden").checked = false;
+  }
+
+  fillGenerationFilter(
+    "managerGenerationFilter",
+    groupMembers(),
+    preserve
+  );
+
+  renderManagerList();
+  showScreen("memberManagerScreen");
+}
+
+$("openMemberManager").addEventListener(
+  "click",
+  () => openMemberManager()
+);
+
+$("backFromMemberManager").addEventListener(
+  "click",
+  () => {
+    fillGenerationFilter(
+      "generationFilter",
+      visibleSelectionMembers(),
+      true
+    );
+
+    renderMemberList();
+    showScreen("memberScreen");
+  }
+);
+
+/* ========================================
+   メンバー管理一覧
+======================================== */
+
+function filteredManagerMembers() {
+  const search = $("managerSearch")
+    .value.trim().toLowerCase();
+
+  const generation =
+    $("managerGenerationFilter").value;
+
+  const showHidden =
+    $("managerShowHidden").checked;
+
+  return groupMembers()
+    .filter(member =>
+      showHidden || !isHidden(member.id)
+    )
+    .filter(member =>
+      generation === "all" ||
+      String(member.generation) === generation
+    )
+    .filter(member =>
+      member.name.toLowerCase().includes(search)
+    );
+}
+
+function renderManagerList() {
+  const container = $("managerMemberList");
+  container.replaceChildren();
+
+  const members = filteredManagerMembers();
+
+  if (!members.length) {
+    container.appendChild(createElement(
+      "p",
+      "empty-message",
+      "該当するメンバーがいません。"
+    ));
+    return;
+  }
+
+  members.forEach(member => {
+    const hidden = isHidden(member.id);
+
+    const card = createElement(
+      "div",
+      "manager-member-card" +
+        (hidden ? " is-hidden" : "")
+    );
+
+    const info = createElement(
+      "div",
+      "manager-member-info"
+    );
+
+    const name = createElement(
+      "span",
+      "manager-member-name",
+      member.name
+    );
+
+    const generation = createElement(
+      "span",
+      "manager-member-generation",
+      member.generation + "期"
+    );
+
+    info.append(name, generation);
+
+    if (hidden) {
+      info.appendChild(createElement(
+        "span",
+        "manager-hidden-label",
+        "非表示"
+      ));
+    }
+
+    const actions = createElement(
+      "div",
+      "manager-member-actions"
+    );
+
+    const editButton = createElement(
+      "button",
+      "",
+      "編集"
+    );
+
+    editButton.type = "button";
+
+    editButton.addEventListener("click", () => {
+      openMemberEdit(member.id);
+    });
+
+    const visibilityButton = createElement(
+      "button",
+      hidden ? "show-button" : "hide-button",
+      hidden ? "再表示" : "非表示"
+    );
+
+    visibilityButton.type = "button";
+
+    visibilityButton.addEventListener(
+      "click",
+      () => toggleMemberVisibility(member.id)
+    );
+
+   
+actions.append(
+  editButton,
+  visibilityButton
+);
+
+// 自分で追加したメンバーだけ削除ボタンを表示
+const isCustomMember =
+  state.memberCustomizations.added.some(
+    item => item.id === member.id
+  );
+
+if (isCustomMember) {
+  const deleteButton = createElement(
+    "button",
+    "hide-button",
+    "削除"
+  );
+
+  deleteButton.type = "button";
+
+  deleteButton.addEventListener("click", () => {
+    deleteCustomMember(member.id);
+  });
+
+  actions.appendChild(deleteButton);
+}
+
+
+    card.append(info, actions);
+    container.appendChild(card);
+  });
+}
+
+$("managerGenerationFilter").addEventListener(
+  "change",
+  renderManagerList
+);
+
+$("managerSearch").addEventListener(
+  "input",
+  renderManagerList
+);
+
+$("managerShowHidden").addEventListener(
+  "change",
+  renderManagerList
+);
+
+// ========================================
+// メンバーID生成
+// ========================================
+
+function generateMemberId() {
+  let id;
+
+  do {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      id = "CUSTOM-" + crypto.randomUUID();
+    } else {
+      id = "CUSTOM-" +
+        Date.now().toString(36) + "-" +
+        Math.random().toString(36).slice(2, 12);
+    }
+  } while (
+    memberMaster.some(member => member.id === id)
+  );
+
+  return id;
+}
+
+// ========================================
+// メンバー追加・編集
+// ========================================
+
+function openMemberEdit(id = null) {
+  editingMemberId = id;
+
+  const member = id
+    ? memberMaster.find(item => item.id === id)
+    : null;
+
+  if (id && !member) {
+    alert("対象のメンバーが見つかりません。");
+    return;
+  }
+
+  $("memberEditTitle").textContent =
+    member ? "メンバー編集" : "メンバー追加";
+
+  $("memberEditGroupName").textContent =
+    selectedGroup;
+
+  $("editMemberName").value =
+    member ? member.name : "";
+
+  $("editMemberGeneration").value =
+    member ? String(member.generation) : "";
+
+  showScreen("memberEditScreen");
+}
+
+$("addCustomMember").addEventListener(
+  "click",
+  () => openMemberEdit()
+);
+
+$("cancelMemberEdit").addEventListener(
+  "click",
+  () => openMemberManager(true)
+);
+
+$("saveMemberEdit").addEventListener(
+  "click",
+  () => {
+    const name =
+      $("editMemberName").value.trim();
+
+    const generationText =
+      $("editMemberGeneration").value.trim();
+
+    const generation = Number(generationText);
+
+    if (!name || name.length > 100) {
+      alert("メンバー名を入力してください。");
+      return;
+    }
+
+    if (
+      !generationText ||
+      !Number.isInteger(generation) ||
+      generation < 1 ||
+      generation > 99
+    ) {
+      alert("期は1～99の整数で入力してください。");
+      return;
+    }
+
+    const duplicate = memberMaster.find(member =>
+      member.group === selectedGroup &&
+      member.id !== editingMemberId &&
+      member.name === name
+    );
+
+    if (duplicate) {
+      alert(
+        "同じグループに同名のメンバーがいます。\n" +
+        "既存メンバーを編集してください。"
+      );
+      return;
+    }
+
+    const next = cloneState();
+    const custom = next.memberCustomizations;
+
+    if (editingMemberId) {
+      const original = memberMaster.find(
+        member => member.id === editingMemberId
+      );
+
+      if (!original) {
+        alert("対象メンバーが見つかりません。");
+        return;
+      }
+
+      const added = custom.added.find(
+        member => member.id === editingMemberId
+      );
+
+      if (added) {
+        added.name = name;
+        added.generation = generation;
+      } else {
+        custom.edits[editingMemberId] = {
+          name,
+          generation
+        };
+      }
+
+    } else {
+      const maxSort = groupMembers().reduce(
+        (max, member) =>
+          Math.max(max, member.sortOrder),
+        0
+      );
+
+      custom.added.push({
+        id: generateMemberId(),
+        group: selectedGroup,
+        name,
+        generation,
+        sortOrder: maxSort + 1
+      });
+    }
+
+    if (!saveState(next)) return;
+
+    try {
+      rebuildMemberMaster();
+    } catch (error) {
+      console.error(error);
+      alert(
+        "メンバー一覧の更新に失敗しました。\n" +
+        error.message
+      );
+      return;
+    }
+
+    editingMemberId = null;
+    openMemberManager(true);
+  }
+);
+
+// ========================================
+// 非表示・再表示
+// ========================================
+
+function toggleMemberVisibility(id) {
+  const member = memberMaster.find(
+    item => item.id === id
+  );
+
+  if (!member) return;
+
+  const hidden = isHidden(id);
+
+  if (!hidden) {
+    const ok = confirm(
+      member.name + "を非表示にしますか？\n\n" +
+      "登録済みのメンバー選択や求・譲データは" +
+      "削除されません。"
+    );
+
+    if (!ok) return;
+  }
+
+  const next = cloneState();
+
+  if (hidden) {
+    next.memberCustomizations.hidden =
+      next.memberCustomizations.hidden.filter(
+        memberId => memberId !== id
+      );
+  } else {
+    next.memberCustomizations.hidden.push(id);
+  }
+
+  if (!saveState(next)) return;
+
+  renderManagerList();
+}
+
+/* ========================================
+   追加メンバー削除
+   求・譲データ保護版
+======================================== */
+
+function deleteCustomMember(id) {
+  const member = memberMaster.find(
+    item => item.id === id
+  );
+
+  if (!member) {
+    alert("対象メンバーが見つかりません。");
+    return;
+  }
+
+  // 初期登録メンバーは削除不可
+  const isCustomMember =
+    state.memberCustomizations.added.some(
+      item => item.id === id
+    );
+
+  if (!isCustomMember) {
+    alert(
+      "初期登録メンバーは削除できません。\n" +
+      "非表示機能をご利用ください。"
+    );
+    return;
+  }
+
+  // 全シリーズの求・譲を確認
+  // 過去のシリーズも含めて検査
+  for (const [seriesId, trade] of
+    Object.entries(state.trades)) {
+
+    for (const mode of ["want", "offer"]) {
+      const types = trade?.[mode]?.[id];
+
+      if (Array.isArray(types) && types.length > 0) {
+        alert(
+          "このメンバーには求・譲データが" +
+          "登録されています。\n\n" +
+          "データ保護のため削除できません。\n" +
+          "先に求・譲の登録を解除してください。"
+        );
+        return;
+      }
+    }
+  }
+
+  const ok = confirm(
+    "「" + member.name + "」を削除しますか？\n\n" +
+    "この操作は元に戻せません。\n" +
+    "メンバー選択からも解除されます。\n\n" +
+    "削除してよろしいですか？"
+  );
+
+  if (!ok) return;
+
+  const next = cloneState();
+  const custom = next.memberCustomizations;
+
+  // 追加メンバー一覧から削除
+  custom.added = custom.added.filter(
+    item => item.id !== id
+  );
+
+  // 編集情報を削除
+  delete custom.edits[id];
+
+  // 非表示情報を削除
+  custom.hidden = custom.hidden.filter(
+    memberId => memberId !== id
+  );
+
+  // 全グループの選択情報から解除
+  for (const group of Object.keys(next.members)) {
+    next.members[group] =
+      next.members[group].filter(
+        memberId => memberId !== id
+      );
+  }
+
+  if (!saveState(next)) return;
+
+  rebuildMemberMaster();
+
+  // メンバー選択画面の未確定状態も更新
+  draftMembers.delete(id);
+
+  openMemberManager(true);
+}
+
+// ========================================
+// シリーズ管理
 // ========================================
 
 function renderSeriesList() {
   const container = $("seriesList");
   container.replaceChildren();
 
-  const list = currentSeriesList();
+  const seriesList = currentSeriesList();
 
-  if (!list.length) {
+  if (!seriesList.length) {
     container.appendChild(createElement(
       "p",
       "empty-message",
@@ -467,77 +1026,98 @@ function renderSeriesList() {
     return;
   }
 
-  list.forEach(series => {
-    const card = createElement("div", "series-card");
+  seriesList.forEach(series => {
+    const card = createElement(
+      "div",
+      "series-card"
+    );
 
     const title = createElement(
       "div",
-      "series-card-title",
+      "series-name",
       series.name
     );
 
     const types = createElement(
       "div",
-      "series-card-types",
-      "種類：" + series.types.join("・")
+      "series-type-summary",
+      series.types.join("・")
     );
 
     const actions = createElement(
       "div",
-      "series-card-actions"
+      "series-actions"
     );
 
-    const edit = createElement("button", "", "編集");
-    edit.type = "button";
-    edit.addEventListener(
+    const tradeButton = createElement(
+      "button",
+      "primary",
+      "求・譲を登録"
+    );
+
+    tradeButton.type = "button";
+
+    tradeButton.addEventListener(
+      "click",
+      () => openTradeScreen(series.id)
+    );
+
+    const editButton = createElement(
+      "button",
+      "secondary",
+      "編集"
+    );
+
+    editButton.type = "button";
+
+    editButton.addEventListener(
       "click",
       () => openSeriesEditor(series.id)
     );
 
-    const remove = createElement(
+    const deleteButton = createElement(
       "button",
-      "delete-button",
+      "secondary",
       "削除"
     );
-    remove.type = "button";
-    remove.addEventListener(
+
+    deleteButton.type = "button";
+
+    deleteButton.addEventListener(
       "click",
       () => deleteSeries(series.id)
     );
 
-    actions.append(edit, remove);
-
-    const trade = createElement(
-      "button",
-      "trade-open-button",
-      "求・譲を登録"
+    actions.append(
+      tradeButton,
+      editButton,
+      deleteButton
     );
 
-    trade.type = "button";
-    trade.addEventListener(
-      "click",
-      () => openTradeEditor(series.id)
-    );
-
-    card.append(title, types, actions, trade);
+    card.append(title, types, actions);
     container.appendChild(card);
   });
 }
-
-// ========================================
-// シリーズ編集
-// ========================================
 
 function openSeriesEditor(id = null) {
   editingSeriesId = id;
 
   const series = id ? findSeries(id) : null;
 
+  if (id && !series) {
+    alert("シリーズが見つかりません。");
+    return;
+  }
+
   $("seriesScreenTitle").textContent =
     series ? "シリーズ編集" : "シリーズ登録";
 
-  $("seriesGroupName").textContent = selectedGroup;
-  $("seriesName").value = series ? series.name : "";
+  $("seriesGroupName").textContent =
+    selectedGroup;
+
+  $("seriesName").value =
+    series ? series.name : "";
+
   $("newTypeName").value = "";
 
   draftSeriesTypes = series
@@ -548,70 +1128,9 @@ function openSeriesEditor(id = null) {
   showScreen("seriesScreen");
 }
 
-function renderSeriesTypes() {
-  const container = $("seriesTypes");
-  container.replaceChildren();
-
-  draftSeriesTypes.forEach(type => {
-    const chip = createElement("span", "type-chip");
-
-    const label = createElement("span", "", type);
-    const remove = createElement("button", "", "×");
-
-    remove.type = "button";
-    remove.setAttribute(
-      "aria-label",
-      type + "を削除"
-    );
-
-    remove.addEventListener("click", () => {
-      draftSeriesTypes = draftSeriesTypes.filter(
-        item => item !== type
-      );
-
-      renderSeriesTypes();
-    });
-
-    chip.append(label, remove);
-    container.appendChild(chip);
-  });
-}
-
-function addSeriesType() {
-  const input = $("newTypeName");
-  const value = input.value.trim();
-
-  if (!value) return;
-
-  if (draftSeriesTypes.includes(value)) {
-    alert("同じ種類がすでにあります。");
-    return;
-  }
-
-  draftSeriesTypes.push(value);
-  input.value = "";
-
-  renderSeriesTypes();
-}
-
 $("addSeries").addEventListener(
   "click",
   () => openSeriesEditor()
-);
-
-$("addType").addEventListener(
-  "click",
-  addSeriesType
-);
-
-$("newTypeName").addEventListener(
-  "keydown",
-  event => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addSeriesType();
-    }
-  }
 );
 
 $("cancelSeries").addEventListener(
@@ -619,24 +1138,61 @@ $("cancelSeries").addEventListener(
   showEditor
 );
 
-function cleanRemovedTypes(trades, id, removedTypes) {
-  const entry = trades[id];
-  if (!entry) return;
+function renderSeriesTypes() {
+  const container = $("seriesTypes");
+  container.replaceChildren();
 
-  for (const mode of ["want", "offer"]) {
-    const members = entry[mode] || {};
+  draftSeriesTypes.forEach(type => {
+    const row = createElement(
+      "div",
+      "series-type-row"
+    );
 
-    for (const memberId of Object.keys(members)) {
-      members[memberId] = members[memberId].filter(
-        type => !removedTypes.includes(type)
-      );
+    const label = createElement(
+      "span",
+      "",
+      type
+    );
 
-      if (!members[memberId].length) {
-        delete members[memberId];
-      }
-    }
-  }
+    const remove = createElement(
+      "button",
+      "small-button",
+      "削除"
+    );
+
+    remove.type = "button";
+
+    remove.addEventListener("click", () => {
+      draftSeriesTypes =
+        draftSeriesTypes.filter(
+          item => item !== type
+        );
+
+      renderSeriesTypes();
+    });
+
+    row.append(label, remove);
+    container.appendChild(row);
+  });
 }
+
+$("addType").addEventListener("click", () => {
+  const type = $("newTypeName").value.trim();
+
+  if (!type) {
+    alert("種類名を入力してください。");
+    return;
+  }
+
+  if (draftSeriesTypes.includes(type)) {
+    alert("同じ種類が登録されています。");
+    return;
+  }
+
+  draftSeriesTypes.push(type);
+  $("newTypeName").value = "";
+  renderSeriesTypes();
+});
 
 $("saveSeries").addEventListener("click", () => {
   const name = $("seriesName").value.trim();
@@ -647,15 +1203,18 @@ $("saveSeries").addEventListener("click", () => {
   }
 
   if (!draftSeriesTypes.length) {
-    alert("種類を1つ以上登録してください。");
+    alert("生写真の種類を1つ以上登録してください。");
     return;
   }
 
-  if (currentSeriesList().some(series =>
-    series.name === name &&
-    series.id !== editingSeriesId
-  )) {
-    alert("同じ名前のシリーズがすでにあります。");
+  const duplicate = currentSeriesList().some(
+    series =>
+      series.name === name &&
+      series.id !== editingSeriesId
+  );
+
+  if (duplicate) {
+    alert("同名のシリーズが登録されています。");
     return;
   }
 
@@ -665,51 +1224,51 @@ $("saveSeries").addEventListener("click", () => {
     next.series[selectedGroup] = [];
   }
 
-  const list = next.series[selectedGroup];
-
   if (editingSeriesId) {
-    const series = list.find(
-      item => item.id === editingSeriesId
+    const target = next.series[selectedGroup].find(
+      series => series.id === editingSeriesId
     );
 
-    if (!series) {
-      alert("編集対象が見つかりません。");
+    if (!target) {
+      alert("シリーズが見つかりません。");
       return;
     }
 
-    const removedTypes = series.types.filter(
-      type => !draftSeriesTypes.includes(type)
-    );
+    target.name = name;
+    target.types = [...draftSeriesTypes];
 
-    if (removedTypes.length) {
-      const ok = confirm(
-        "次の種類を削除します。\n\n" +
-        removedTypes.join("・") +
-        "\n\n関連する求・譲も削除されます。\n" +
-        "続行しますか？"
-      );
+    // 削除した種類の求・譲データを整理
+    const trade = next.trades[target.id];
 
-      if (!ok) return;
+    if (trade) {
+      for (const mode of ["want", "offer"]) {
+        for (const memberId of Object.keys(trade[mode])) {
+          const remaining = trade[mode][memberId]
+            .filter(type =>
+              target.types.includes(type)
+            );
 
-      cleanRemovedTypes(
-        next.trades,
-        editingSeriesId,
-        removedTypes
-      );
+          if (remaining.length) {
+            trade[mode][memberId] = remaining;
+          } else {
+            delete trade[mode][memberId];
+          }
+        }
+      }
     }
 
-    series.name = name;
-    series.types = [...draftSeriesTypes];
-
   } else {
+    const id = generateSeriesId();
+
     next.series[selectedGroup].push({
-      id: generateSeriesId(),
+      id,
       name,
       types: [...draftSeriesTypes]
     });
   }
 
   if (saveState(next)) {
+    editingSeriesId = null;
     showEditor();
   }
 });
@@ -719,8 +1278,8 @@ function deleteSeries(id) {
   if (!series) return;
 
   const ok = confirm(
-    "「" + series.name + "」を削除しますか？\n" +
-    "関連する求・譲も削除されます。"
+    "「" + series.name + "」を削除しますか？\n\n" +
+    "このシリーズの求・譲データも削除されます。"
   );
 
   if (!ok) return;
@@ -728,7 +1287,7 @@ function deleteSeries(id) {
   const next = cloneState();
 
   next.series[selectedGroup] =
-    next.series[selectedGroup].filter(
+    (next.series[selectedGroup] || []).filter(
       item => item.id !== id
     );
 
@@ -739,27 +1298,22 @@ function deleteSeries(id) {
   }
 }
 
-// ========================================
-// 求・譲登録
-// ========================================
+/* ========================================
+   求・譲登録
+======================================== */
 
-function getTradeTypes(seriesId, mode, memberId) {
-  return state.trades[seriesId]?.[mode]?.[memberId] || [];
-}
-
-function openTradeEditor(id) {
-  const series = findSeries(id);
+function openTradeScreen(seriesId) {
+  const series = findSeries(seriesId);
 
   if (!series) {
     alert("シリーズが見つかりません。");
     return;
   }
 
-  currentTradeSeriesId = id;
+  currentTradeSeriesId = seriesId;
   currentTradeMode = "want";
 
-  $("tradeSeriesName").textContent =
-    selectedGroup + "｜" + series.name;
+  $("tradeSeriesName").textContent = series.name;
 
   updateTradeTabs();
   renderTradeMemberList();
@@ -779,29 +1333,30 @@ function updateTradeTabs() {
   );
 }
 
-function changeTradeMode(mode) {
-  currentTradeMode = mode;
+$("wantTab").addEventListener("click", () => {
+  currentTradeMode = "want";
   updateTradeTabs();
   renderTradeMemberList();
-}
+});
 
-$("wantTab").addEventListener(
-  "click",
-  () => changeTradeMode("want")
-);
-
-$("offerTab").addEventListener(
-  "click",
-  () => changeTradeMode("offer")
-);
+$("offerTab").addEventListener("click", () => {
+  currentTradeMode = "offer";
+  updateTradeTabs();
+  renderTradeMemberList();
+});
 
 $("backFromTrade").addEventListener(
   "click",
-  () => {
-    currentTradeSeriesId = null;
-    showEditor();
-  }
+  showEditor
 );
+
+function getTradeTypes(seriesId, mode, memberId) {
+  return (
+    state.trades[seriesId] &&
+    state.trades[seriesId][mode] &&
+    state.trades[seriesId][mode][memberId]
+  ) || [];
+}
 
 function updateTradeCheck(memberId, type, checked) {
   const series = findSeries(currentTradeSeriesId);
@@ -819,9 +1374,8 @@ function updateTradeCheck(memberId, type, checked) {
     };
   }
 
-  const members = next.trades[
-    series.id
-  ][currentTradeMode];
+  const members =
+    next.trades[series.id][currentTradeMode];
 
   const current = members[memberId] || [];
 
@@ -891,8 +1445,8 @@ function renderTradeMemberList() {
     const name = createElement(
       "div",
       "trade-member-name",
-      member.name + "（" +
-        member.generation + "期）"
+      member.name +
+        "（" + member.generation + "期）"
     );
 
     const typeList = createElement(
@@ -976,6 +1530,7 @@ $("backFromBoard").addEventListener(
       "board-fullscreen"
     );
 
+    updateFullscreenButton();
     showEditor();
   }
 );
@@ -984,6 +1539,7 @@ document.querySelectorAll(".board-mode").forEach(
   button => {
     button.addEventListener("click", () => {
       currentBoardMode = button.dataset.mode;
+
       updateBoardModeButtons();
       renderBoard();
     });
@@ -1002,43 +1558,41 @@ function updateBoardModeButtons() {
 }
 
 function boardEntries(mode) {
-  const result = [];
+  const entries = [];
   const members = sortedSelectedMembers();
 
   for (const series of currentSeriesList()) {
     const lines = [];
 
     for (const member of members) {
-      const registered = getTradeTypes(
+      const types = getTradeTypes(
         series.id,
         mode,
         member.id
+      ).filter(type =>
+        series.types.includes(type)
       );
 
-      const types = series.types.filter(
-        type => registered.includes(type)
-      );
+      if (!types.length) continue;
 
-      if (types.length) {
-        lines.push({
-          name: member.name,
-          types
-        });
-      }
+      lines.push({
+        member: member.name,
+        types
+      });
     }
 
     if (lines.length) {
-      result.push({
-        name: series.name,
+      entries.push({
+        series: series.name,
         lines
       });
     }
   }
 
-  return result;
+  return entries;
 }
 
-function renderBoardPanel(mode, containerId) {
+function renderBoardColumn(containerId, mode) {
   const container = $(containerId);
   container.replaceChildren();
 
@@ -1048,64 +1602,72 @@ function renderBoardPanel(mode, containerId) {
     container.appendChild(createElement(
       "p",
       "board-empty",
-      "登録されている生写真はありません。"
+      "登録データはありません。"
     ));
     return;
   }
 
-  entries.forEach(series => {
-    const section = createElement(
+  entries.forEach(entry => {
+    const block = createElement(
       "div",
       "board-series"
     );
 
-    section.appendChild(createElement(
+    const heading = createElement(
       "div",
-      "board-series-name",
-      series.name
-    ));
+      "board-series-title",
+      entry.series
+    );
 
-    series.lines.forEach(member => {
-      section.appendChild(createElement(
+    block.appendChild(heading);
+
+    entry.lines.forEach(line => {
+      const row = createElement(
         "div",
-        "board-member-line",
-        member.name + "　" +
-          member.types.join("・")
-      ));
+        "board-member-row"
+      );
+
+      const member = createElement(
+        "span",
+        "board-member-name",
+        line.member
+      );
+
+      const types = createElement(
+        "span",
+        "board-member-types",
+        line.types.join("・")
+      );
+
+      row.append(member, types);
+      block.appendChild(row);
     });
 
-    container.appendChild(section);
+    container.appendChild(block);
   });
 }
 
 function renderBoard() {
-  const showWant =
-    currentBoardMode !== "offer";
+  const want = $("wantBoard");
+  const offer = $("offerBoard");
 
-  const showOffer =
-    currentBoardMode !== "want";
+  want.classList.toggle(
+    "hidden",
+    currentBoardMode === "offer"
+  );
 
-  $("wantBoard").hidden = !showWant;
-  $("offerBoard").hidden = !showOffer;
+  offer.classList.toggle(
+    "hidden",
+    currentBoardMode === "want"
+  );
 
   $("boardLayout").classList.toggle(
-    "single-mode",
+    "single-column",
     currentBoardMode !== "both"
   );
 
-  if (showWant) {
-    renderBoardPanel(
-      "want",
-      "wantBoardContent"
-    );
-  }
-
-  if (showOffer) {
-    renderBoardPanel(
-      "offer",
-      "offerBoardContent"
-    );
-  }
+  renderBoardColumn("wantBoardContent", "want");
+  renderBoardColumn("offerBoardContent", "offer");
 }
 
 // ========================================
@@ -1132,9 +1694,10 @@ function applyBoardSettings() {
 $("boardFontSize").addEventListener(
   "change",
   () => {
+    const size = $("boardFontSize").value;
+
     const next = cloneState();
-    next.settings.fontSize =
-      $("boardFontSize").value;
+    next.settings.fontSize = size;
 
     if (saveState(next)) {
       applyBoardSettings();
@@ -1176,9 +1739,11 @@ $("toggleFullscreen").addEventListener(
         "board-fullscreen"
       );
 
-    } else if (document.body.classList.contains(
-      "board-fullscreen"
-    )) {
+    } else if (
+      document.body.classList.contains(
+        "board-fullscreen"
+      )
+    ) {
       document.body.classList.remove(
         "board-fullscreen"
       );
@@ -1188,12 +1753,10 @@ $("toggleFullscreen").addEventListener(
         "board-fullscreen"
       );
 
-      // 対応ブラウザでは本当の全画面へ
       if (screen.requestFullscreen) {
         try {
           await screen.requestFullscreen();
         } catch (error) {
-          // 非対応環境では画面内の拡大表示を維持
           console.log(
             "ブラウザ全画面は利用できません。",
             error
@@ -1226,7 +1789,6 @@ document.addEventListener(
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
-  // localhost または HTTPS でのみ登録
   if (
     location.protocol !== "https:" &&
     location.hostname !== "localhost" &&

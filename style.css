@@ -838,3 +838,156 @@ body.board-fullscreen .board-member-line {
     padding: 4px;
   }
 }
+
+/* ========================================
+   メンバー管理機能
+   Ver.1.1 追加スタイル
+======================================== */
+
+/* メンバー管理画面へのボタン */
+.member-manager-launch {
+  margin-top: 16px;
+}
+
+/* メンバー管理画面の期別フィルター */
+.manager-filter-row {
+  margin-top: 22px;
+}
+
+/* メンバー管理画面の検索欄 */
+#managerSearch {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d8d4e2;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+/* 非表示メンバーを表示するチェック欄 */
+.manager-show-hidden {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 15px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.manager-show-hidden input {
+  width: 19px;
+  height: 19px;
+  accent-color: #7448b8;
+}
+
+/* メンバー管理一覧 */
+.manager-member-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* メンバーごとの管理カード */
+.manager-member-card {
+  padding: 13px;
+  border: 1px solid #e2dce9;
+  border-radius: 11px;
+  background: white;
+}
+
+/* 非表示メンバーのカード */
+.manager-member-card.is-hidden {
+  background: #f7f7f8;
+  border-color: #dddddf;
+}
+
+/* メンバー情報 */
+.manager-member-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manager-member-name {
+  font-size: 16px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.manager-member-generation {
+  color: #777;
+  font-size: 13px;
+}
+
+/* 非表示状態の表示 */
+.manager-hidden-label {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #e8e8eb;
+  color: #666;
+  font-size: 12px;
+}
+
+/* 管理操作ボタン */
+.manager-member-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manager-member-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 7px;
+  border: 1px solid #d8d4e2;
+  border-radius: 8px;
+  background: #f7f5fa;
+  color: #7448b8;
+  font-size: 13px;
+}
+
+/* 非表示操作ボタン */
+.manager-member-actions .hide-button {
+  background: #fff8f1;
+  color: #995a20;
+  border-color: #ead3b8;
+}
+
+/* 再表示操作ボタン */
+.manager-member-actions .show-button {
+  background: #f0f8f1;
+  color: #28723a;
+  border-color: #bcdcc4;
+}
+
+/* メンバー追加・編集フォーム */
+#editMemberName,
+#editMemberGeneration {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d8d4e2;
+  border-radius: 9px;
+  background: white;
+  font-size: 16px;
+}
+
+/* スマートフォン向け調整 */
+@media (max-width: 480px) {
+
+  .manager-member-card {
+    padding: 12px;
+  }
+
+  .manager-member-actions button {
+    padding: 10px 6px;
+    font-size: 13px;
+  }
+
+  .manager-member-name {
+    font-size: 15px;
+  }
+}
+
