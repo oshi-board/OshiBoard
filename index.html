@@ -1,0 +1,254 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#7448b8">
+  <meta name="description"
+        content="生写真交換用の非公式ファン制作アプリ。無料・広告なし・会員登録不要。">
+  <title>推しボード</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+<main class="container">
+
+  <header id="appHeader" class="header">
+    <h1>推しボード</h1>
+    <p>生写真交換をもっと便利に。</p>
+  </header>
+
+  <!-- グループ選択 -->
+  <section id="groupScreen" class="screen">
+    <h2>グループを選択</h2>
+
+    <button class="group"
+            data-group="乃木坂46"
+            style="--group-color:#8b65bd">
+      乃木坂46
+    </button>
+
+    <button class="group"
+            data-group="櫻坂46"
+            style="--group-color:#e58cae">
+      櫻坂46
+    </button>
+
+    <button class="group"
+            data-group="日向坂46"
+            style="--group-color:#70b8e7">
+      日向坂46
+    </button>
+
+    <button id="groupNext" class="primary" disabled>
+      このグループで始める
+    </button>
+  </section>
+
+  <!-- 編集画面 -->
+  <section id="editorScreen" class="screen hidden">
+    <div class="screen-heading">
+      <h2 id="editorGroupName"></h2>
+      <button id="changeGroup" class="small-button">
+        グループ変更
+      </button>
+    </div>
+
+    <h3>選択中のメンバー</h3>
+    <div id="selectedMembers" class="selected-list"></div>
+
+    <button id="openMembers" class="primary">
+      メンバーを選択・変更
+    </button>
+
+    <h3>生写真シリーズ</h3>
+    <div id="seriesList" class="series-list"></div>
+
+    <button id="addSeries" class="primary">
+      ＋ シリーズを登録
+    </button>
+
+    <button id="openBoard" class="primary board-launch">
+      交換ボードを表示
+    </button>
+  </section>
+
+  <!-- メンバー選択 -->
+  <section id="memberScreen" class="screen hidden">
+    <h2>メンバー選択</h2>
+    <p id="memberGroupName" class="subheading"></p>
+
+    <div class="status-tabs">
+      <button id="activeTab" class="status-tab active">
+        現役
+      </button>
+      <button id="graduatedTab" class="status-tab">
+        卒業
+      </button>
+    </div>
+
+    <div class="filter-row">
+      <label for="generationFilter">期別</label>
+      <select id="generationFilter">
+        <option value="all">すべての期</option>
+      </select>
+    </div>
+
+    <input id="memberSearch"
+           type="search"
+           placeholder="メンバー名を検索"
+           autocomplete="off">
+
+    <div class="selection-toolbar">
+      <span id="selectionCount">0人選択中</span>
+      <button id="selectAll" class="text-button">
+        表示中を全選択
+      </button>
+      <button id="clearAll" class="text-button">
+        全解除
+      </button>
+    </div>
+
+    <div id="memberList" class="member-list"></div>
+
+    <div class="action-row">
+      <button id="cancelMembers" class="secondary">
+        キャンセル
+      </button>
+      <button id="confirmMembers" class="primary">
+        決定
+      </button>
+    </div>
+  </section>
+
+  <!-- シリーズ登録 -->
+  <section id="seriesScreen" class="screen hidden">
+    <h2 id="seriesScreenTitle">シリーズ登録</h2>
+    <p id="seriesGroupName" class="subheading"></p>
+
+    <label class="field-label" for="seriesName">
+      シリーズ名
+    </label>
+
+    <input id="seriesName"
+           type="text"
+           maxlength="100"
+           placeholder="例：2026年 夏衣装">
+
+    <h3>生写真の種類</h3>
+    <div id="seriesTypes" class="series-types"></div>
+
+    <div class="type-input-row">
+      <input id="newTypeName"
+             type="text"
+             maxlength="40"
+             placeholder="例：座り">
+      <button id="addType" class="secondary">追加</button>
+    </div>
+
+    <p class="hint">
+      種類はシリーズごとに自由に登録できます。
+    </p>
+
+    <div class="action-row">
+      <button id="cancelSeries" class="secondary">
+        キャンセル
+      </button>
+      <button id="saveSeries" class="primary">
+        保存
+      </button>
+    </div>
+  </section>
+
+  <!-- 求・譲登録 -->
+  <section id="tradeScreen" class="screen hidden">
+    <div class="screen-heading">
+      <h2>求・譲の登録</h2>
+      <button id="backFromTrade" class="small-button">
+        戻る
+      </button>
+    </div>
+
+    <p id="tradeSeriesName" class="subheading"></p>
+
+    <div class="status-tabs">
+      <button id="wantTab" class="status-tab active">求</button>
+      <button id="offerTab" class="status-tab">譲</button>
+    </div>
+
+    <p id="tradeSelectionCount" class="hint"></p>
+    <div id="tradeMemberList" class="trade-member-list"></div>
+
+    <p class="hint">チェック変更時に自動保存されます。</p>
+  </section>
+
+  <!-- 交換ボード -->
+  <section id="boardScreen" class="screen hidden">
+    <div id="boardToolbar" class="board-toolbar">
+      <div class="screen-heading">
+        <h2 id="boardGroupName">交換ボード</h2>
+        <button id="backFromBoard" class="small-button">
+          編集に戻る
+        </button>
+      </div>
+
+      <div class="board-mode-tabs">
+        <button class="board-mode active" data-mode="both">
+          求・譲
+        </button>
+        <button class="board-mode" data-mode="want">
+          求のみ
+        </button>
+        <button class="board-mode" data-mode="offer">
+          譲のみ
+        </button>
+      </div>
+
+      <div class="board-controls">
+        <label for="boardFontSize">文字サイズ</label>
+        <select id="boardFontSize">
+          <option value="small">小</option>
+          <option value="medium">標準</option>
+          <option value="large">大</option>
+          <option value="xlarge">特大</option>
+        </select>
+
+        <button id="toggleFullscreen" class="secondary">
+          全画面表示
+        </button>
+      </div>
+    </div>
+
+    <div id="boardLayout"
+         class="board-layout font-medium">
+
+      <section id="wantBoard"
+               class="board-panel want-panel">
+        <h3>求</h3>
+        <div id="wantBoardContent"></div>
+      </section>
+
+      <section id="offerBoard"
+               class="board-panel offer-panel">
+        <h3>譲</h3>
+        <div id="offerBoardContent"></div>
+      </section>
+    </div>
+  </section>
+
+  <footer id="appFooter">
+    非公式ファン制作アプリ<br>
+    無料・広告なし・会員登録不要
+  </footer>
+
+</main>
+</body>
+</html>

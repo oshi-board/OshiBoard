@@ -1,0 +1,70 @@
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512"
+     height="512"
+     viewBox="0 0 512 512">
+
+  <rect width="512"
+        height="512"
+        rx="100"
+        fill="#7448b8"/>
+
+  <rect x="90"
+        y="110"
+        width="332"
+        height="292"
+        rx="30"
+        fill="#ffffff"/>
+
+  <rect x="114"
+        y="134"
+        width="284"
+        height="56"
+        rx="14"
+        fill="#eee8f7"/>
+
+  <text x="256"
+        y="176"
+        font-size="38"
+        font-family="sans-serif"
+        font-weight="bold"
+        text-anchor="middle"
+        fill="#7448b8">
+    推し
+  </text>
+
+  <rect x="114"
+        y="210"
+        width="132"
+        height="164"
+        rx="14"
+        fill="#fff0f5"/>
+
+  <rect x="266"
+        y="210"
+        width="132"
+        height="164"
+        rx="14"
+        fill="#edf5ff"/>
+
+  <text x="180"
+        y="310"
+        font-size="70"
+        font-family="sans-serif"
+        font-weight="bold"
+        text-anchor="middle"
+        fill="#a02b58">
+    求
+  </text>
+
+  <text x="332"
+        y="310"
+        font-size="70"
+        font-family="sans-serif"
+        font-weight="bold"
+        text-anchor="middle"
+        fill="#205f9d">
+    譲
+  </text>
+
+</svg>

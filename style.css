@@ -1,0 +1,840 @@
+
+/* ========================================
+   推しボード 公開準備版
+======================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "Helvetica Neue", Arial,
+    "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    Meiryo, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f5f3f8;
+  color: #292632;
+  line-height: 1.5;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.container {
+  width: min(100%, 960px);
+  min-height: 100dvh;
+  margin: auto;
+  padding: 16px;
+  background: white;
+}
+
+.header {
+  padding: 16px 0 20px;
+  text-align: center;
+  border-bottom: 1px solid #eee9f3;
+}
+
+.header h1 {
+  margin: 0;
+  color: #7448b8;
+  font-size: 27px;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: #777;
+  font-size: 13px;
+}
+
+.screen {
+  padding: 20px 0;
+}
+
+.hidden,
+[hidden] {
+  display: none !important;
+}
+
+h2 {
+  margin: 0 0 18px;
+  font-size: 21px;
+}
+
+h3 {
+  margin: 24px 0 12px;
+  font-size: 17px;
+}
+
+.primary,
+.secondary {
+  display: block;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.primary {
+  border: 1px solid #7448b8;
+  background: #7448b8;
+  color: white;
+}
+
+.secondary {
+  border: 1px solid #c9b6e2;
+  background: white;
+  color: #7448b8;
+}
+
+.small-button {
+  padding: 8px 11px;
+  border: 1px solid #ddd5e8;
+  border-radius: 8px;
+  background: white;
+  color: #555;
+  font-size: 13px;
+}
+
+.screen-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.screen-heading h2 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.screen-heading button {
+  flex-shrink: 0;
+}
+
+.subheading {
+  margin: 8px 0 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.hint {
+  margin: 14px 0;
+  color: #777;
+  font-size: 13px;
+}
+
+.empty-message {
+  color: #888;
+  font-size: 14px;
+}
+
+footer {
+  padding: 24px 0;
+  border-top: 1px solid #eee9f3;
+  color: #888;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ========================================
+   グループ選択
+======================================== */
+
+.group {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 18px;
+  border: 2px solid #e7e3ed;
+  border-left: 8px solid var(--group-color);
+  border-radius: 12px;
+  background: white;
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: left;
+}
+
+.group.selected {
+  border-color: var(--group-color);
+  background: #f8f5fc;
+}
+
+#groupNext {
+  margin-top: 20px;
+}
+
+/* ========================================
+   メンバー選択
+======================================== */
+
+.selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.member-chip {
+  padding: 7px 11px;
+  border-radius: 20px;
+  background: #eee8f7;
+  color: #5e368e;
+  font-size: 14px;
+}
+
+.status-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 14px;
+}
+
+.status-tab {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #d8d4e2;
+  border-radius: 10px;
+  background: white;
+  color: #555;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.status-tab.active {
+  background: #7448b8;
+  border-color: #7448b8;
+  color: white;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filter-row label {
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.filter-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d8d4e2;
+  border-radius: 8px;
+  background: white;
+}
+
+#memberSearch {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d8d4e2;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+#selectionCount {
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.text-button {
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  color: #7448b8;
+  font-size: 12px;
+}
+
+.member-list {
+  max-height: 48dvh;
+  overflow-y: auto;
+  border: 1px solid #e7e3ed;
+  border-radius: 10px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.member-row:last-child {
+  border-bottom: 0;
+}
+
+.member-row input,
+.trade-type-label input {
+  width: 19px;
+  height: 19px;
+  accent-color: #7448b8;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.action-row button {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ========================================
+   シリーズ
+======================================== */
+
+.series-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.series-card {
+  padding: 14px;
+  border: 1px solid #ddd8e8;
+  border-radius: 12px;
+  background: white;
+}
+
+.series-card-title {
+  font-size: 16px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.series-card-types {
+  margin-top: 6px;
+  color: #666;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.series-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.series-card-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #d8d4e2;
+  border-radius: 8px;
+  background: #f7f5fa;
+}
+
+.series-card-actions .delete-button {
+  color: #b52b3a;
+  background: #fff5f5;
+}
+
+.trade-open-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #7448b8;
+  border-radius: 9px;
+  background: #7448b8;
+  color: white;
+  font-weight: bold;
+}
+
+.field-label {
+  display: block;
+  margin: 16px 0 8px;
+  font-weight: bold;
+}
+
+#seriesName,
+#newTypeName {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d8d4e2;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+.series-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 20px;
+  background: #eee8f7;
+  font-size: 14px;
+}
+
+.type-chip button {
+  border: 0;
+  background: transparent;
+  color: #7448b8;
+  font-size: 18px;
+}
+
+.type-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.type-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.type-input-row button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* ========================================
+   求・譲登録
+======================================== */
+
+.trade-member-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.trade-member-card {
+  padding: 14px;
+  border: 1px solid #ddd8e8;
+  border-radius: 12px;
+  background: white;
+}
+
+.trade-member-name {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.trade-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.trade-type-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.trade-empty-message {
+  padding: 18px;
+  border-radius: 10px;
+  background: #f7f5fa;
+  color: #777;
+  text-align: center;
+}
+
+/* ========================================
+   交換ボード
+======================================== */
+
+.board-launch {
+  margin-top: 12px;
+}
+
+.board-toolbar {
+  margin-bottom: 16px;
+}
+
+.board-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+
+.board-mode {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 5px;
+  border: 1px solid #d8d4e2;
+  border-radius: 9px;
+  background: white;
+  color: #555;
+  font-weight: bold;
+}
+
+.board-mode.active {
+  border-color: #7448b8;
+  background: #7448b8;
+  color: white;
+}
+
+.board-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.board-controls label {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.board-controls select {
+  padding: 9px;
+  border: 1px solid #d8d4e2;
+  border-radius: 8px;
+  background: white;
+}
+
+.board-controls .secondary {
+  width: auto;
+  margin-left: auto;
+  padding: 9px 12px;
+}
+
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.board-layout.single-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.board-panel {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.want-panel {
+  border: 1px solid #ecc0d1;
+  background: #fff0f5;
+}
+
+.offer-panel {
+  border: 1px solid #bdd8f3;
+  background: #edf5ff;
+}
+
+.board-panel h3 {
+  margin: 0 0 12px;
+  font-size: 1.6em;
+  text-align: center;
+}
+
+.want-panel h3 {
+  color: #a02b58;
+}
+
+.offer-panel h3 {
+  color: #205f9d;
+}
+
+.board-series {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #0002;
+}
+
+.board-series-name {
+  font-size: 1.05em;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.board-member-line {
+  margin-top: 7px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.board-empty {
+  padding: 16px 0;
+  color: #777;
+  text-align: center;
+}
+
+.font-small {
+  font-size: 18px;
+}
+
+.font-medium {
+  font-size: 24px;
+}
+
+.font-large {
+  font-size: 34px;
+}
+
+.font-xlarge {
+  font-size: 46px;
+}
+
+/* 縦向き：上下 / 横向き：左右 */
+@media (orientation: landscape) {
+  .board-layout:not(.single-mode) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ========================================
+   全画面表示
+   交換ボードを最大限広く表示
+======================================== */
+
+/* 全画面時の背景 */
+body.board-fullscreen {
+  background: white;
+}
+
+/* 外側の余白を最小化 */
+body.board-fullscreen .container {
+  width: 100%;
+  max-width: none;
+  padding: 4px;
+}
+
+/* アプリのヘッダーとフッターを非表示 */
+body.board-fullscreen #appHeader,
+body.board-fullscreen #appFooter {
+  display: none !important;
+}
+
+/* ボード画面の余白を削減 */
+body.board-fullscreen #boardScreen {
+  padding: 0;
+}
+
+/* グループ名・交換ボード見出し・戻るボタンを非表示 */
+body.board-fullscreen #boardScreen .screen-heading {
+  display: none !important;
+}
+
+/* 求・譲の表示切替ボタンを非表示 */
+body.board-fullscreen #boardScreen .board-mode-tabs {
+  display: none !important;
+}
+
+/* ツールバーの余白を最小化 */
+body.board-fullscreen #boardScreen .board-toolbar {
+  margin: 0 0 5px;
+}
+
+/* 文字サイズと全画面終了を横並び */
+body.board-fullscreen #boardScreen .board-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 3px 0 6px;
+}
+
+/* 文字サイズラベルを小さく */
+body.board-fullscreen #boardScreen .board-controls label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 文字サイズの選択欄をコンパクトに */
+body.board-fullscreen #boardFontSize {
+  width: auto;
+  min-width: 65px;
+  padding: 6px 4px;
+  font-size: 13px;
+}
+
+/* 全画面終了ボタンをコンパクトに */
+body.board-fullscreen #toggleFullscreen {
+  width: auto;
+  margin-left: 4px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 求・譲パネルの間隔を縮小 */
+body.board-fullscreen .board-layout {
+  gap: 6px;
+}
+
+/* 求・譲パネル内の余白を縮小 */
+body.board-fullscreen .board-panel {
+  padding: 9px;
+  border-radius: 8px;
+}
+
+/* 求・譲の見出し */
+body.board-fullscreen .board-panel h3 {
+  margin: 0 0 6px;
+}
+
+/* シリーズごとの余白を縮小 */
+body.board-fullscreen .board-series {
+  margin-top: 7px;
+  padding-top: 6px;
+}
+
+/* メンバーごとの余白を縮小 */
+body.board-fullscreen .board-member-line {
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* ========================================
+   ブラウザ標準のFullscreen API
+======================================== */
+
+#boardScreen:fullscreen {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 4px;
+  background: white;
+}
+
+/* API全画面時も不要な見出しを非表示 */
+#boardScreen:fullscreen .screen-heading,
+#boardScreen:fullscreen .board-mode-tabs {
+  display: none !important;
+}
+
+/* API全画面時のツールバー */
+#boardScreen:fullscreen .board-toolbar {
+  margin: 0 0 5px;
+}
+
+/* API全画面時の操作欄 */
+#boardScreen:fullscreen .board-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 3px 0 6px;
+}
+
+#boardScreen:fullscreen .board-controls label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#boardScreen:fullscreen #boardFontSize {
+  width: auto;
+  min-width: 65px;
+  padding: 6px 4px;
+  font-size: 13px;
+}
+
+#boardScreen:fullscreen #toggleFullscreen {
+  width: auto;
+  margin-left: 4px;
+  padding: 7px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* API全画面時のパネル */
+#boardScreen:fullscreen .board-layout {
+  width: 100%;
+  gap: 6px;
+}
+
+#boardScreen:fullscreen .board-panel {
+  padding: 9px;
+  border-radius: 8px;
+}
+
+#boardScreen:fullscreen .board-panel h3 {
+  margin: 0 0 6px;
+}
+
+#boardScreen:fullscreen .board-series {
+  margin-top: 7px;
+  padding-top: 6px;
+}
+
+#boardScreen:fullscreen .board-member-line {
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* ========================================
+   スマホ
+======================================== */
+
+@media (max-width: 480px) {
+  .container {
+    padding: 12px;
+  }
+
+  .screen {
+    padding: 16px 0;
+  }
+
+  h2 {
+    font-size: 19px;
+  }
+
+  .board-panel {
+    padding: 11px;
+  }
+
+  /* 全画面表示時は通常のスマホ余白を適用しない */
+  body.board-fullscreen .container {
+    padding: 4px;
+  }
+
+  body.board-fullscreen #boardScreen {
+    padding: 0;
+  }
+
+  #boardScreen:fullscreen {
+    padding: 4px;
+  }
+}
