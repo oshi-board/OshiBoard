@@ -1810,7 +1810,7 @@ function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener("load", () => {
+  const register = () => {
     navigator.serviceWorker.register("./sw.js")
       .then(() => {
         console.log("PWA準備完了");
@@ -1821,7 +1821,13 @@ function registerServiceWorker() {
           error
         );
       });
-  });
+  };
+
+  if (document.readyState === "complete") {
+    register();
+  } else {
+    window.addEventListener("load", register, { once: true });
+  }
 }
 
 // ========================================
@@ -1849,7 +1855,7 @@ async function initializeApp() {
   }
 
   await loadMemberMaster();
-  registerServiceWorker();
 }
 
+registerServiceWorker();
 initializeApp();
